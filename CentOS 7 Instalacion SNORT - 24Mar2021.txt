@@ -1,0 +1,62 @@
+INSTALACION SNORT EN CENTOS 7 x86_64 - 24Marzo2021
+
+yum install epel-release
+
+yum install gcc flex bison zlib zlib-devel libpcap libpcap-devel pcre pcre-devel libdnet libdnet-devel openssl openssl-devel
+yum install tcpdump gcc make wget libtool libnghttp2 libnghttp2-devel luajit luajit-devel
+
+
+mkdir /home/recursos
+cd /home/recursos
+
+wget https://www.snort.org/downloads/archive/snort/daq-2.0.6-1.centos7.x86_64.rpm
+chmod 775 daq-2.0.6-1.centos7.x86_64.rpm
+yum install daq-2.0.6-1.centos7.x86_64.rpm
+wget https://www.snort.org/downloads/archive/snort/snort-2.9.9.0-1.centos7.x86_64.rpm
+chmod 775 snort-2.9.9.0-1.centos7.x86_64.rpm
+yum install snort-2.9.9.0-1.centos7.x86_64.rpm
+
+yum list installed | grep daq
+yum list installed | grep snort
+
+ln -s /usr/lib64/libdnet.so.1.0.1 /usr/lib64/libdnet.1
+ldconfig
+mkdir /usr/local/lib/snort_dynamicrules
+chmod -R 5775 /usr/local/lib/snort_dynamicrules
+chown -R snort:snort /usr/local/lib/snort_dynamicrules
+touch /etc/snort/rules/white_list.rules
+touch /etc/snort/rules/black_list.rules
+touch /etc/snort/rules/local.rules
+chown -R snort:snort /etc/snort/rules
+mkdir /var/log/snort/archive
+chkconfig snortd on
+
+cd /etc/snort/rules
+wget https://www.snort.org/rules/snortrules-snapshot-29111.tar.gz?oinkcode=8d8af067ded5f1a1caaf6b881cfcef806e10605c
+tar -xvf snortrules* -C /etc/snort
+
+cp /etc/snort/snort.conf /etc/snort/snort.conf.bak
+nano /etc/snort/snort.conf
+
+Line 45: ipvar HOME_NET 192.168.0.0/24
+Line 48: ipvar EXTERNAL_NET !$HOME_NET
+Line 113: var WHITE_LIST_PATH rules
+Line 114: var BLACK_LIST_PATH rules
+Line 418: preprocessor sfportscan: proto  { all } memcap { 10000000 } sense_level { low }
+Line 521: output unified2: filename snort.log, limit 128, mpls_event_types, vlan_event_types
+
+cp /etc/sysconfig/snort /etc/sysconfig/snort.bak
+nano /etc/sysconfig/snort
+
+Line 15: INTERFACE=enp0s3
+Line 69: ALERTMODE=
+Line 81: BINARY_LOG=0
+
+snort -T -c /etc/snort/snort.conf
+
+nano /etc/snort/rules/local.rules
+alert icmp any any -> $HOME_NET any (msg:"ICMP Prueba de Snort"; sid:10000001; rev:001;)
+
+/sbin/snort -A console -i enp0s3 -u snort -g snort -c /etc/snort/snort.conf
+
+/sbin/snort -vd -i enp0s3 -u snort -g snort -c /etc/snort/snort.conf

@@ -1,0 +1,72 @@
+INSTALACION BARNYARD EN RASPBERRY PI
+
+apt-get install software-properties-common dirmngr 
+apt-key adv --recv-keys --keyserver keyserver.ubuntu.com 0xF1656F24C74CD1D8 
+# add-apt-repository 'deb [arch=amd64,arm64,ppc64el] https://espejito.fder.edu.uy/mariadb/repo/10.4/debian buster main'
+apt-get update
+
+# apt install libmariadb-dev libmysqlclient-dev mariadb-client
+apt install mariadb-client libmariadb-dev
+ln -s /usr/lib/arm-linux-gnueabihf/libmariadbclient.so /usr/lib/arm-linux-gnueabihf/libmysqlclient.so
+
+nano /etc/apt/sources.list
+	deb http://ftp.de.debian.org/debian buster main 
+apt-get update
+apt-get install libnet1-dev
+
+cd /home/recursos
+wget https://github.com/firnsy/barnyard2/archive/master.tar.gz -O barnyard2-Master.tar.gz
+tar zxvf barnyard2-Master.tar.gz
+cd /home/recursos/barnyard2-master
+autoreconf -fvi -I ./m4
+ln -s /usr/include/dumbnet.h /usr/include/dnet.h
+ldconfig
+./configure --with-mysql --with-mysql-libraries=/usr/lib/arm-linux-gnueabihf --with-mysql-includes=/usr/include/mariadb
+# ./configure --with-mysql --with-mysql-libraries=/usr/lib/x86_64-linux-gnu --with-mysql-includes=/usr/include/mariadb
+make
+sudo make install
+
+barnyard2 -V
+
+mkdir /var/log/barnyard2
+chmod -R 5775 /var/log/barnyard2
+chown snort:snort /var/log/barnyard2
+touch /var/log/snort/barnyard2.waldo
+chmod 5775 /var/log/snort/barnyard2.waldo
+chown snort:snort /var/log/snort/barnyard2.waldo
+
+cd /home/recursos/barnyard2-master
+cp /home/recursos/barnyard2-master/etc/barnyard2.conf /etc/snort/
+
+nano /etc/snort/snort.conf
+	output unified2: filename snort.u2, limit 128
+
+chmod o-r /etc/snort/barnyard2.conf
+nano /etc/snort/barnyard2.conf
+	# config waldo_file: /var/log/snort/barnyard2.waldo
+	input unified2
+	# output alert_fast: stdout
+	output database: log, mysql, user=snort password=snort dbname=snort host=192.168.0.16 sensor_name=rpi1
+
+mysql -h 192.168.0.16 -usnort -psnort -D snort -e "select count(*) from event"
+mysql -h 192.168.0.16 -usnort -psnort -D snort -e "select * from sensor"
+
+snort -A console -i eth0 -u snort -g snort -c /etc/snort/snort.conf -L snort.u2
+snort -A console -i eth0 -u snort -g snort -c /etc/snort/snort.conf -l /var/log/snort -L snort.u2
+
+# barnyard2 -c /etc/snort/barnyard2.conf -d /var/log/snort -f snort.u2 -w /var/log/snort/barnyard2.waldo -g snort -u snort -G /etc/snort/gen-msg.map -S /etc/snort/sid-msg.map
+rm /var/log/snort/barnyard2.waldo
+barnyard2 -v -c /etc/snort/barnyard2.conf -d /var/log/snort -f snort.u2 -w /var/log/snort/barnyard2.waldo -g snort -u snort
+
+barnyard2 -c /etc/snort/barnyard2.conf -d /var/log/snort -f snort.u2 -w /var/log/snort/barnyard2.waldo -G /etc/snort/gen-msg.map -S /etc/snort/sid-msg.map
+
+
+
+
+
+
+
+
+
+
+

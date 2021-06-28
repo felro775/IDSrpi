@@ -1,0 +1,92 @@
+sudo passwd
+su
+
+#CONFIGURAR ZONA HORARIA
+raspi-config
+
+ifconfig
+systemctl enable ssh
+systemctl status ssh
+
+apt-get install gcc libpcre3-dev zlib1g-dev libluajit-5.1-dev libpcap-dev openssl libssl-dev libnghttp2-dev libdumbnet-dev bison flex libdnet autoconf libtool
+apt-get install liblzma-dev pkg-config
+mkdir /home/recursos
+cd /home/recursos
+
+wget https://www.snort.org/downloads/snort/daq-2.0.7.tar.gz
+tar -xvzf daq-2.0.7.tar.gz
+cd daq-2.0.7
+autoreconf -f -i
+./configure
+make
+sudo make install
+
+cd /home/recursos
+wget https://www.snort.org/downloads/snort/snort-2.9.18.tar.gz
+tar -xvzf snort-2.9.18.tar.gz
+cd snort-2.9.18
+./configure --enable-sourcefire
+make
+sudo make install
+
+ldconfig
+ln -s /usr/local/bin/snort /usr/sbin/snort
+
+snort -V
+
+groupadd snort
+useradd snort -r -s /sbin/nologin -c SNORT_IDS -g snort
+
+mkdir /etc/snort
+mkdir /etc/snort/rules
+mkdir /etc/snort/rules/iplists
+mkdir /etc/snort/so_rules
+mkdir /etc/snort/preproc_rules
+mkdir /usr/local/lib/snort_dynamicrules
+mkdir /var/log/snort
+mkdir /var/log/snort/archived_logs
+
+touch /etc/snort/rules/iplists/black_list.rules
+touch /etc/snort/rules/iplists/white_list.rules
+touch /etc/snort/rules/local.rules
+touch /etc/snort/sid-msg.map
+
+chmod -R 5775 /etc/snort
+chmod -R 5775 /var/log/snort
+chmod -R 5775 /var/log/snort/archived_logs
+chmod -R 5775 /usr/local/lib/snort_dynamicrules
+
+chown -R snort:snort /etc/snort
+chown -R snort:snort /var/log/snort
+chown -R snort:snort /usr/local/lib/snort_dynamicrules
+
+cp /home/recursos/snort-2.9.18/etc/*.conf* /etc/snort
+cp /home/recursos/snort-2.9.18/etc/*.map /etc/snort
+cp /home/recursos/snort-2.9.18/etc/*.dtd /etc/snort
+
+sed -i "s/include \$RULE\_PATH/#include \$RULE\_PATH/" /etc/snort/snort.conf
+
+cp /etc/snort/snort.conf /etc/snort/snort.conf.bak
+nano /etc/snort/snort.conf
+	Line 45: ipvar HOME_NET 192.168.0.0/24
+	Line 48: ipvar EXTERNAL_NET !$HOME_NET
+		  var RULE_PATH /etc/snort/rules
+		  var SO_RULE_PATH /etc/snort/so_rules
+		  var PREPROC_RULE_PATH /etc/snort/preproc_rules
+	Line 113: var WHITE_LIST_PATH /etc/snort/rules/iplists
+	Line 114: var BLACK_LIST_PATH /etc/snort/rules/iplists
+	# Line 418: preprocessor sfportscan: proto  { all } memcap { 10000000 } sense_level { low }
+		  output unified2: filename snort.u2, limit 128
+	# Line 521: output unified2: filename snort.log, limit 128, mpls_event_types, vlan_event_types
+
+snort -T -c /etc/snort/snort.conf
+
+nano /etc/snort/rules/local.rules
+alert icmp any any -> $HOME_NET any (msg:"ICMP test"; sid:10000001; rev:001;)
+
+snort -A console -i eth0 -u snort -g snort -c /etc/snort/snort.conf
+
+snort -r /var/log/snort/snort.log.
+
+
+

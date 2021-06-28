@@ -1,0 +1,124 @@
+	INSTALACION SNORT - DEBIAN 10
+
+### INICIAMOS E INSTALAMOS EL SERVICIO SSH ###
+
+ssh -V
+nano /etc/apt/sources.list
+	deb http://deb.debian.org/debian buster main
+	deb-src http://deb.debian.org/debian buster main
+
+	deb http://deb.debian.org/debian-security/ buster/updates main
+	deb-src http://deb.debian.org/debian-security/ buster/updates main
+	
+sudo apt-get update
+sudo apt-get install openssh-server
+which ssh
+systemctl status sshd
+systemctl enable ssh
+nano /etc/ssh/sshd_config
+
+apt-get install net-tools
+netstat -tulpn | grep 22
+
+### INSTALAMOS LAS LIBRERIAS Y DEPENDENCIAS PARA SNORT ###
+
+apt install gcc libpcre3-dev zlib1g-dev libluajit-5.1-dev
+apt install libpcap-dev openssl libssl-dev libnghttp2-dev libdumbnet-dev
+apt install bison flex libdnet autoconf libtool
+apt-get install build-essential cmake
+
+mkdir /home/frojas/Recursos
+cd /home/frojas/Recursos
+
+wget https://www.snort.org/downloads/snort/daq-2.0.7.tar.gz
+tar xvzf daq-2.0.7.tar.gz
+cd daq-2.0.7
+autoreconf -f -i
+./configure
+make
+sudo make install
+
+cd /home/frojas/Recursos
+wget https://www.snort.org/downloads/snort/snort-2.9.18.tar.gz
+tar xvzf snort-2.9.18.tar.gz
+cd snort-2.9.18
+./configure --enable-sourcefire
+make
+sudo make install
+
+/usr/sbin/ldconfig
+/usr/sbin/snort --version
+ln -s /usr/local/bin/snort /usr/sbin/snort
+/usr/sbin/snort --version
+
+/usr/sbin/groupadd snort
+/usr/sbin/useradd snort -r -s /sbin/nologin -c SNORT_IDS -g snort
+
+mkdir /etc/snort
+mkdir /etc/snort/rules
+mkdir /etc/snort/rules/iplists
+mkdir /etc/snort/so_rules
+mkdir /etc/snort/preproc_rules
+mkdir /usr/local/lib/snort_dynamicrules
+mkdir /var/log/snort
+mkdir /var/log/snort/archived_logs
+
+touch /etc/snort/rules/iplists/black_list.rules
+touch /etc/snort/rules/iplists/white_list.rules
+touch /etc/snort/rules/local.rules
+touch /etc/snort/sid-msg.map
+
+chmod -R 5775 /etc/snort
+chmod -R 5775 /var/log/snort
+chmod -R 5775 /var/log/snort/archived_logs
+chmod -R 5775 /usr/local/lib/snort_dynamicrules
+
+chown -R snort:snort /etc/snort
+chown -R snort:snort /var/log/snort
+chown -R snort:snort /usr/local/lib/snort_dynamicrules
+
+cp /home/frojas/Recursos/snort-2.9.18/etc/*.conf* /etc/snort
+cp /home/frojas/Recursos/snort-2.9.18/etc/*.map /etc/snort
+cp /home/frojas/Recursos/snort-2.9.18/etc/*.dtd /etc/snort
+
+sed -i "s/include \$RULE\_PATH/#include \$RULE\_PATH/" /etc/snort/snort.conf
+
+cp /etc/snort/snort.conf /etc/snort/snort.conf.bak
+nano /etc/snort/snort.conf
+	Line 45: ipvar HOME_NET 192.168.0.0/24
+	Line 48: ipvar EXTERNAL_NET !$HOME_NET
+		  var RULE_PATH /etc/snort/rules
+		  var SO_RULE_PATH /etc/snort/so_rules
+		  var PREPROC_RULE_PATH /etc/snort/preproc_rules
+	Line 113: var WHITE_LIST_PATH /etc/snort/rules/iplists
+	Line 114: var BLACK_LIST_PATH /etc/snort/rules/iplists
+	# Line 418: preprocessor sfportscan: proto  { all } memcap { 10000000 } sense_level { low }
+		  output unified2: filename snort.u2, limit 128
+
+snort -T -c /etc/snort/snort.conf
+
+nano /etc/snort/rules/local.rules
+alert icmp any any -> $HOME_NET any (msg:"ICMP test"; sid:10000001; rev:001;)
+
+snort -A console -i enp0s3 -u snort -g snort -c /etc/snort/snort.conf
+snort -A console -i enp0s3 -u snort -g snort -c /etc/snort/snort.conf -l /var/log/snort -L snort.u2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

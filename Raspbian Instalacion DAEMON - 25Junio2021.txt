@@ -1,0 +1,60 @@
+
+nano /lib/systemd/system/snort.service
+
+[Unit]
+Description=Snort NIDS Daemon
+After=syslog.target network.target
+ 
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/snort -q -u snort -g snort -c /etc/snort/snort.conf -i eth0
+ 
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable snort.service
+systemctl status snort.service
+systemctl restart snort.service
+
+
+
+
+nano /lib/systemd/system/barnyard2.service
+
+[Unit]
+Description=Barnyard2 Daemon
+After=syslog.target network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/barnyard2 -n -c /etc/snort/barnyard2.conf -d /var/log/snort -f snort.u2 -q -w /var/log/snort/barnyard2.waldo -g snort -u snort -D -a /var/log/snort/archived_logs
+
+[Install]
+WantedBy=multi-user.target
+
+systemctl enable barnyard2
+systemctl start barnyard2
+systemctl status barnyard2
+
+#--nolock-pidfile
+# I used --nolock-pidfile but you can try --create-pidfile /var/lock/subsys/barnyard2.pid.
+
+systemctl status mariadb.service
+mysql -usnort -psnort -D snort -e "select count(*) from event"
+mysql -h 192.168.0.26 -usnort -psnort -D snort -e "select count(*) from event"
+
+systemctl status mariadb.service
+
+mysql -uroot -proot
+	use snort;		
+	grant all privileges on *.* to 'snort'@'192.168.0.26' identified by 'snort';
+	flush privileges;
+	exit;
+
+mysql -usnort -psnort -D snort -e "select signature,count(*) as cnt,inet_ntoa(ip_src) from event,iphdr where event.cid=iphdr.cid and event.sid=iphdr.sid group by ip_src order by cnt"
+mysql -usnort -psnort -D snort -e "select inet_ntoa(ip_src),count(*) from iphdr group by ip_src limit 5"
+mysql -usnort -psnort -D snort -e "select inet_ntoa(iphdr.ip_src) as SRC,inet_ntoa(iphdr.ip_dst) as DST,timestamp from event,iphdr,icmphdr where (icmphdr.sid,icmphdr.cid)=(event.sid,event.cid) and (iphdr.sid,iphdr.cid)=(event.sid,event.cid) and icmp_type=8 limit 3"
+
+snort -r /var/log/snort/snort.log.
+apt-get install tcpdump
+tcpdump -r snort.log.1622268500
